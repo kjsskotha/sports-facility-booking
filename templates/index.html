@@ -5,358 +5,448 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sports Facility Booking</title>
-    <style>
-        :root {
-            --navy: #10243e;
-            --teal: #087f8c;
-            --light: #f3f7fb;
-            --text: #1c2a3a;
-            --muted: #64748b;
-            --border: #dce5ee;
-        }
 
-        * { box-sizing: border-box; }
+    <style>
+        * {
+            box-sizing: border-box;
+        }
 
         body {
             margin: 0;
-            background: var(--light);
-            color: var(--text);
             font-family: Arial, Helvetica, sans-serif;
+            background: #f1f5f9;
+            color: #1e293b;
         }
 
         header {
-            padding: 34px 20px;
+            background: #102b46;
             color: white;
-            background: linear-gradient(120deg, #10243e, #087f8c);
+            padding: 35px 20px;
+            text-align: center;
         }
 
-        .header-inner, main {
-            width: min(1100px, 92%);
-            margin: auto;
+        header h1 {
+            margin: 0 0 10px;
+            font-size: 32px;
         }
 
-        header h1 { margin: 0 0 10px; font-size: clamp(26px, 4vw, 38px); }
-        header p { margin: 0; color: #e0f2fe; line-height: 1.6; }
-
-        .tag {
-            display: inline-block;
-            margin-top: 16px;
-            padding: 7px 12px;
-            border: 1px solid #ffffff55;
-            border-radius: 20px;
-            font-size: 13px;
+        header p {
+            margin: 0;
+            color: #dbeafe;
         }
 
-        main { padding: 28px 0 50px; }
-
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 16px;
-            margin-bottom: 22px;
+        nav {
+            background: #ffffff;
+            padding: 14px;
+            text-align: center;
+            border-bottom: 1px solid #dbe3ed;
         }
 
-        .stat, .panel, .facility {
+        nav a {
+            color: #087f8c;
+            text-decoration: none;
+            font-weight: bold;
+            margin: 0 14px;
+        }
+
+        main {
+            max-width: 1050px;
+            margin: 28px auto;
+            padding: 0 16px;
+        }
+
+        .card {
             background: white;
-            border: 1px solid var(--border);
+            padding: 24px;
+            border: 1px solid #dbe5ef;
             border-radius: 14px;
-            box-shadow: 0 5px 18px #10243e0a;
+            margin-bottom: 22px;
+            box-shadow: 0 4px 15px rgba(15, 23, 42, 0.04);
         }
 
-        .stat { padding: 20px; }
-        .stat span { color: var(--muted); font-size: 14px; }
-        .stat strong { display: block; margin-top: 8px; font-size: 25px; }
-
-        .panel { padding: 24px; margin-bottom: 22px; }
-        h2 { margin: 0 0 8px; font-size: 22px; }
-        .sub { color: var(--muted); line-height: 1.5; margin: 0 0 20px; }
-
-        .facility-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 14px;
-            margin-bottom: 24px;
+        h2 {
+            margin-top: 0;
+            font-size: 23px;
         }
 
-        .facility { padding: 17px; }
-        .sport-icon { font-size: 28px; }
-        .facility h3 { margin: 12px 0 7px; }
-        .facility p { color: var(--muted); margin: 6px 0; font-size: 14px; }
-        .rate { color: var(--teal); font-weight: bold; font-size: 19px; margin-top: 14px; }
+        .description {
+            color: #64748b;
+            line-height: 1.6;
+        }
 
-        form.booking-form {
+        .form-grid {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 16px;
         }
 
-        .field { display: flex; flex-direction: column; gap: 7px; }
-        .field.full { grid-column: 1 / -1; }
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
 
-        label { font-size: 14px; font-weight: bold; }
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-size: 14px;
+            font-weight: bold;
+        }
 
         input, select {
             width: 100%;
             padding: 12px;
             border: 1px solid #cbd5e1;
-            border-radius: 8px;
+            border-radius: 7px;
+            font-size: 15px;
             background: white;
-            color: var(--text);
-            font: inherit;
+            color: #1e293b;
         }
 
         input:focus, select:focus {
-            outline: 2px solid #99dce0;
-            border-color: var(--teal);
+            outline: 2px solid #99dce2;
+            border-color: #087f8c;
         }
 
-        button {
-            cursor: pointer;
-            border: 0;
-            border-radius: 8px;
-            padding: 12px 16px;
-            background: var(--teal);
+        button, .button {
+            background: #087f8c;
             color: white;
-            font: inherit;
+            border: none;
+            border-radius: 7px;
+            padding: 12px 18px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        button:hover, .button:hover {
+            background: #066874;
+        }
+
+        .cost-box {
+            background: #effafa;
+            padding: 12px;
+            border-radius: 7px;
+            border: 1px solid #c6eeee;
+            min-height: 43px;
+            color: #075b64;
             font-weight: bold;
         }
 
-        button:hover { background: #066874; }
-        .submit-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
-        .hint { color: var(--muted); font-size: 13px; }
-
-        .message {
-            padding: 13px 15px;
-            border-radius: 9px;
-            margin-bottom: 14px;
-            line-height: 1.5;
+        .table-wrap {
+            overflow-x: auto;
         }
 
-        .success { background: #dcfce7; color: #166534; }
-        .error { background: #fee2e2; color: #991b1b; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 650px;
+        }
 
-        .table-wrap { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; min-width: 760px; }
-        th, td { text-align: left; padding: 13px 12px; border-bottom: 1px solid var(--border); }
-        th { background: #eaf4f5; font-size: 13px; }
-        td { font-size: 14px; }
-        .status { font-weight: bold; color: #087f8c; }
-        .cancelled { color: #b91c1c; }
-        .cancel-button { padding: 7px 10px; font-size: 12px; background: #b91c1c; }
-        .empty { padding: 22px 0; color: var(--muted); }
-        footer { padding: 20px; text-align: center; color: var(--muted); font-size: 13px; }
+        th, td {
+            padding: 14px 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
 
-        @media (max-width: 600px) {
-            .panel { padding: 17px; }
-            form.booking-form { grid-template-columns: 1fr; }
-            .field.full, .submit-row { grid-column: auto; }
+        th {
+            background: #e9f3f4;
+        }
+
+        .empty {
+            color: #64748b;
+            padding: 22px 0;
+        }
+
+        .message {
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            color: #065f46;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 18px;
+        }
+
+        .error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 18px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 25px 15px;
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        @media (max-width: 650px) {
+            header h1 {
+                font-size: 26px;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .full-width {
+                grid-column: auto;
+            }
+
+            .card {
+                padding: 18px;
+            }
         }
     </style>
 </head>
+
 <body>
+
 <header>
-    <div class="header-inner">
-        <h1>Sports Facility Booking</h1>
-        <p>Find your game. Choose your time. Book your facility.</p>
-        <span class="tag">Sports Facility Booking &amp; Usage Tracking · DBMS Project</span>
-    </div>
+    <h1>Sports Facility Booking</h1>
+    <p>Find your game. Choose your facility. Book your time.</p>
 </header>
 
+<nav>
+    <a href="#facilities">Facilities</a>
+    <a href="#booking">Book Now</a>
+    <a href="#reports">Bookings</a>
+</nav>
+
 <main>
+
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% for category, message in messages %}
-            <div class="message {{ category }}">{{ message }}</div>
+            <div class="{{ 'error' if category == 'error' else 'message' }}">
+                {{ message }}
+            </div>
         {% endfor %}
     {% endwith %}
 
-    <section class="stats">
-        <div class="stat">
-            <span>Active bookings</span>
-            <strong>{{ report.total_bookings }}</strong>
-        </div>
-        <div class="stat">
-            <span>Booked usage value</span>
-            <strong>₹{{ "%.2f"|format(report.total_usage_value) }}</strong>
-        </div>
-        <div class="stat">
-            <span>Available facilities</span>
-            <strong>{{ facilities|length }}</strong>
-        </div>
-    </section>
-
-    <section class="panel">
-        <h2>Choose your sports facility</h2>
-        <p class="sub">Compare the sports, locations and hourly rates before booking.</p>
-
-        <div class="facility-grid">
-            {% for facility in facilities %}
-                <article class="facility">
-                    <div class="sport-icon">
-                        {% if facility.sport == "Football" %}⚽
-                        {% elif facility.sport == "Basketball" %}🏀
-                        {% elif facility.sport == "Tennis" %}🎾
-                        {% elif facility.sport == "Cricket" %}🏏
-                        {% else %}🏸{% endif %}
-                    </div>
-                    <h3>{{ facility.facility_name }}</h3>
-                    <p>Sport: {{ facility.sport }}</p>
-                    <p>Location: {{ facility.location }}</p>
-                    <div class="rate">₹{{ "%.2f"|format(facility.hourly_rate) }} / hour</div>
-                </article>
-            {% else %}
-                <p>No facilities are available at the moment.</p>
-            {% endfor %}
-        </div>
-    </section>
-
-    <section class="panel" id="book">
-        <h2>Make a booking</h2>
-        <p class="sub">Use sample details for this demonstration. The total is calculated by the backend.</p>
+    <section class="card" id="facilities">
+        <h2>Available Sports Facilities</h2>
+        <p class="description">
+            Explore the facilities, locations and hourly charges before booking.
+        </p>
 
         {% if facilities %}
-        <form class="booking-form" action="{{ url_for('book') }}" method="POST">
-            <div class="field">
-                <label for="customer_name">Demo customer name</label>
-                <input id="customer_name" name="customer_name" maxlength="100"
-                       placeholder="Enter a demo name" required>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Facility</th>
+                            <th>Sport</th>
+                            <th>Location</th>
+                            <th>Price per hour</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for facility in facilities %}
+                        <tr>
+                            <td>{{ facility.name }}</td>
+                            <td>{{ facility.sport }}</td>
+                            <td>{{ facility.location }}</td>
+                            <td>₹{{ "%.2f"|format(facility.hourly_rate|float) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
+        {% else %}
+            <p class="empty">No facilities are currently available.</p>
+        {% endif %}
+    </section>
 
-            <div class="field">
-                <label for="email">Demo email</label>
-                <input id="email" name="email" type="email" maxlength="150"
-                       placeholder="student@example.com" required>
-            </div>
+    <section class="card" id="booking">
+        <h2>Book a Sports Facility</h2>
+        <p class="description">
+            Enter your details, choose a facility and select your preferred time.
+        </p>
 
-            <div class="field full">
-                <label for="facility_id">Select a facility</label>
-                <select id="facility_id" name="facility_id" required>
-                    <option value="">Choose a sports facility</option>
-                    {% for facility in facilities %}
-                    <option value="{{ facility.facility_id }}"
-                            data-rate="{{ facility.hourly_rate }}">
-                        {{ facility.facility_name }} — {{ facility.sport }}
-                        (₹{{ "%.2f"|format(facility.hourly_rate) }}/hour)
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
+        <form action="{{ url_for('create_booking') }}" method="POST" id="bookingForm">
+            <div class="form-grid">
 
-            <div class="field">
-                <label for="booking_date">Booking date</label>
-                <input id="booking_date" name="booking_date" type="date"
-                       min="{{ today }}" required>
-            </div>
+                <div class="field">
+                    <label for="customer_name">Your name</label>
+                    <input
+                        type="text"
+                        id="customer_name"
+                        name="customer_name"
+                        placeholder="Enter your name"
+                        required
+                        maxlength="100"
+                    >
+                </div>
 
-            <div class="field">
-                <label for="start_time">Start time</label>
-                <input id="start_time" name="start_time" type="time" required>
-            </div>
+                <div class="field">
+                    <label for="email">Email address</label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        placeholder="you@example.com"
+                        required
+                        maxlength="150"
+                    >
+                </div>
 
-            <div class="field">
-                <label for="end_time">End time</label>
-                <input id="end_time" name="end_time" type="time" required>
-            </div>
+                <div class="field full-width">
+                    <label for="facility_id">Select a facility</label>
+                    <select id="facility_id" name="facility_id" required>
+                        <option value="">Choose a sports facility</option>
+                        {% for facility in facilities %}
+                        <option
+                            value="{{ facility.id }}"
+                            data-rate="{{ facility.hourly_rate }}"
+                        >
+                            {{ facility.name }} — {{ facility.sport }}
+                            (₹{{ "%.2f"|format(facility.hourly_rate|float) }}/hour)
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
 
-            <div class="field">
-                <label>Estimated cost</label>
-                <input id="estimated_cost" value="Select a facility and time" readonly>
-            </div>
+                <div class="field">
+                    <label for="booking_date">Booking date</label>
+                    <input
+                        type="date"
+                        id="booking_date"
+                        name="booking_date"
+                        min="{{ today }}"
+                        required
+                    >
+                </div>
 
-            <div class="submit-row">
-                <button type="submit">Confirm booking</button>
-                <span class="hint">A slot must be available before the booking is saved.</span>
+                <div class="field">
+                    <label for="start_time">Start time</label>
+                    <input
+                        type="time"
+                        id="start_time"
+                        name="start_time"
+                        required
+                    >
+                </div>
+
+                <div class="field">
+                    <label for="end_time">End time</label>
+                    <input
+                        type="time"
+                        id="end_time"
+                        name="end_time"
+                        required
+                    >
+                </div>
+
+                <div class="field">
+                    <label>Estimated booking cost</label>
+                    <div class="cost-box" id="estimatedCost" aria-live="polite">
+                        Select a facility and time
+                    </div>
+                </div>
+
+                <div class="full-width">
+                    <button type="submit">Confirm Booking</button>
+                </div>
+
             </div>
         </form>
-        {% else %}
-            <p>No facilities are available to book.</p>
-        {% endif %}
     </section>
 
-    <section class="panel">
-        <h2>Booking and usage report</h2>
-        <p class="sub">Recent demo bookings retrieved from the MySQL database.</p>
+    <section class="card" id="reports">
+        <h2>Booking and Usage Report</h2>
+        <p class="description">
+            Review recent bookings and facility usage.
+        </p>
 
         {% if bookings %}
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Customer</th>
-                        <th>Facility</th>
-                        <th>Date</th>
-                        <th>Start</th>
-                        <th>End</th>
-                        <th>Hours</th>
-                        <th>Total</th>
-                        <th>Status / Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for booking in bookings %}
-                    <tr>
-                        <td>{{ booking.booking_id }}</td>
-                        <td>{{ booking.customer_name }}</td>
-                        <td>{{ booking.facility_name }}</td>
-                        <td>{{ booking.booking_date }}</td>
-                        <td>{{ booking.start_time }}</td>
-                        <td>{{ booking.end_time }}</td>
-                        <td>{{ booking.hours }}</td>
-                        <td>₹{{ "%.2f"|format(booking.total_cost) }}</td>
-                        <td>
-                            {% if booking.status == "Booked" %}
-                                <span class="status">Booked</span>
-                                <form action="{{ url_for('cancel_booking', booking_id=booking.booking_id) }}"
-                                      method="POST"
-                                      onsubmit="return confirm('Cancel this demo booking?');">
-                                    <button class="cancel-button" type="submit">Cancel</button>
-                                </form>
-                            {% else %}
-                                <span class="cancelled">Cancelled</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Booking ID</th>
+                            <th>Facility</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Total Cost</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for booking in bookings %}
+                        <tr>
+                            <td>{{ booking.id }}</td>
+                            <td>{{ booking.facility_name }}</td>
+                            <td>{{ booking.booking_date }}</td>
+                            <td>{{ booking.start_time }} – {{ booking.end_time }}</td>
+                            <td>₹{{ "%.2f"|format(booking.total_cost|float) }}</td>
+                            <td>{{ booking.status }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         {% else %}
-            <p class="empty">No bookings yet. Make the first demo booking above.</p>
+            <p class="empty">No bookings yet. Make your first booking!</p>
         {% endif %}
     </section>
+
 </main>
 
-<footer>Academic demonstration only · Sample data · No online payments</footer>
+<footer>
+    Sports Facility Booking · Choose your game and reserve your time
+</footer>
 
 <script>
     const facilitySelect = document.getElementById("facility_id");
+    const dateInput = document.getElementById("booking_date");
     const startInput = document.getElementById("start_time");
     const endInput = document.getElementById("end_time");
-    const estimate = document.getElementById("estimated_cost");
+    const costBox = document.getElementById("estimatedCost");
 
-    function updateEstimate() {
-        const option = facilitySelect?.selectedOptions[0];
-        const rate = Number(option?.dataset.rate);
-        const start = startInput?.value;
-        const end = endInput?.value;
+    function updateCost() {
+        const option = facilitySelect.options[facilitySelect.selectedIndex];
+        const rate = parseFloat(option.dataset.rate);
+        const start = startInput.value;
+        const end = endInput.value;
 
-        if (!option?.value || !start || !end || end <= start) {
-            estimate.value = "Select a valid time range";
+        if (!facilitySelect.value || !start || !end || !Number.isFinite(rate)) {
+            costBox.textContent = "Select a facility and time";
             return;
         }
 
-        const toMinutes = value => {
-            const parts = value.split(":").map(Number);
-            return parts[0] * 60 + parts[1];
-        };
+        const startParts = start.split(":").map(Number);
+        const endParts = end.split(":").map(Number);
+        const startMinutes = startParts[0] * 60 + startParts[1];
+        const endMinutes = endParts[0] * 60 + endParts[1];
 
-        const hours = (toMinutes(end) - toMinutes(start)) / 60;
-        estimate.value = "₹" + (hours * rate).toFixed(2);
+        if (endMinutes <= startMinutes) {
+            costBox.textContent = "End time must be after start time";
+            return;
+        }
+
+        const hours = (endMinutes - startMinutes) / 60;
+        const total = rate * hours;
+        costBox.textContent = "₹" + total.toFixed(2) + " (" + hours + " hour(s))";
     }
 
-    [facilitySelect, startInput, endInput].forEach(element => {
-        element?.addEventListener("change", updateEstimate);
+    facilitySelect.addEventListener("change", updateCost);
+    startInput.addEventListener("input", updateCost);
+    endInput.addEventListener("input", updateCost);
+
+    document.getElementById("bookingForm").addEventListener("submit", function(event) {
+        if (endInput.value && startInput.value && endInput.value <= startInput.value) {
+            event.preventDefault();
+            alert("Please select an end time later than the start time.");
+        }
     });
 </script>
+
 </body>
 </html>
