@@ -230,7 +230,7 @@ def book():
 
         # Customer and booking are saved together in one transaction.
         connection.commit()
-        flash("Booking successful! Your booking is saved in MySQL.", "success")
+        flash("Booking successful! Your booking is saved .", "success")
 
     except Exception:
         connection.rollback()
