@@ -1,294 +1,285 @@
-
 import os
-import ssl
-from datetime import date
-from decimal import Decimal
+import hmac
+import secrets
+from datetime import date, datetime
+from decimal import Decimal, ROUND_HALF_UP
+from functools import wraps
 
 import pymysql
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import (
+    Flask, render_template, request, redirect, url_for, session,
+    flash, abort
+)
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "demo-only-change-this")
+app.config.update(
+    SECRET_KEY=os.environ.get("SECRET_KEY", ""),
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.environ.get("RENDER", "").lower() == "true",
+)
 
-# Read credentials from Render environment variables.
-DB_CONFIG = {
-    "host": os.environ.get("MYSQL_HOST", ""),
-    "port": int(os.environ.get("MYSQL_PORT", "17622")),
-    "user": os.environ.get("MYSQL_USERNAME", ""),
-    "password": os.environ.get("MYSQL_PASSWORD", ""),
-    "database": os.environ.get("MYSQL_DATABASE", "defaultdb"),
-    "charset": "utf8mb4",
-    "cursorclass": pymysql.cursors.DictCursor,
-    "connect_timeout": 10,
-    "read_timeout": 10,
-    "write_timeout": 10,
-    "autocommit": False,
-    "ssl": {"check_hostname": False},
-}
+if not app.config["SECRET_KEY"]:
+    raise RuntimeError("Set SECRET_KEY in your hosting environment variables.")
 
 
-def get_db():
-    required = ["host", "user", "password", "database"]
-    if any(not DB_CONFIG[key] for key in required):
-        raise RuntimeError(
-            "Database credentials are missing. Set the MYSQL environment variables in Render."
-        )
-    return pymysql.connect(**DB_CONFIG)
+def db_connect():
+    return pymysql.connect(
+        host=os.environ["MYSQL_HOST"],
+        port=int(os.environ.get("MYSQL_PORT", "3306")),
+        user=os.environ.get("MYSQL_USERNAME") or os.environ.get("MYSQL_USER"),
+        password=os.environ["MYSQL_PASSWORD"],
+        database=os.environ["MYSQL_DATABASE"],
+        cursorclass=pymysql.cursors.DictCursor,
+        autocommit=False,
+        connect_timeout=10,
+        charset="utf8mb4",
+    )
 
 
-def setup_db():
-    """Create the project's relational tables and demo facilities."""
-    connection = get_db()
+def csrf_token():
+    token = session.get("csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["csrf_token"] = token
+    return token
+
+
+app.jinja_env.globals["csrf_token"] = csrf_token
+
+
+def verify_csrf():
+    submitted = request.form.get("csrf_token", "")
+    saved = session.get("csrf_token", "")
+    if not submitted or not saved or not hmac.compare_digest(submitted, saved):
+        abort(400, description="Invalid form token. Refresh the page and try again.")
+
+
+def provider_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if session.get("provider_authenticated") is not True:
+            return redirect(url_for("provider_login", next=request.path))
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def get_facilities():
+    connection = db_connect()
     try:
         with connection.cursor() as cursor:
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS facilities (
-                    facility_id INT AUTO_INCREMENT PRIMARY KEY,
-                    facility_name VARCHAR(100) NOT NULL,
-                    sport VARCHAR(60) NOT NULL,
-                    location VARCHAR(120) NOT NULL,
-                    hourly_rate DECIMAL(10,2) NOT NULL,
-                    is_available BOOLEAN NOT NULL DEFAULT TRUE
-                ) ENGINE=InnoDB
-            """)
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS customers (
-                    customer_id INT AUTO_INCREMENT PRIMARY KEY,
-                    customer_name VARCHAR(100) NOT NULL,
-                    email VARCHAR(150) NOT NULL
-                ) ENGINE=InnoDB
-            """)
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS bookings (
-                    booking_id INT AUTO_INCREMENT PRIMARY KEY,
-                    customer_id INT NOT NULL,
-                    facility_id INT NOT NULL,
-                    booking_date DATE NOT NULL,
-                    start_time TIME NOT NULL,
-                    end_time TIME NOT NULL,
-                    hours DECIMAL(5,2) NOT NULL,
-                    total_cost DECIMAL(10,2) NOT NULL,
-                    status ENUM('Booked', 'Cancelled') NOT NULL DEFAULT 'Booked',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (customer_id)
-                        REFERENCES customers(customer_id),
-                    FOREIGN KEY (facility_id)
-                        REFERENCES facilities(facility_id),
-                    INDEX idx_facility_date (facility_id, booking_date, status)
-                ) ENGINE=InnoDB
-            """)
-
-            cursor.execute("SELECT COUNT(*) AS total FROM facilities")
-            if cursor.fetchone()["total"] == 0:
-                cursor.executemany("""
-                    INSERT INTO facilities
-                        (facility_name, sport, location, hourly_rate)
-                    VALUES (%s, %s, %s, %s)
-                """, [
-                    ("Badminton Court A", "Badminton", "Sports Block 1", 100),
-                    ("Football Ground", "Football", "Main Ground", 300),
-                    ("Basketball Court B", "Basketball", "Sports Block 2", 150),
-                    ("Tennis Court A", "Tennis", "Outdoor Zone", 200),
-                    ("Cricket Practice Net", "Cricket", "Practice Area", 250),
-                ])
-
-        connection.commit()
-    except Exception:
-        connection.rollback()
-        raise
+            cursor.execute(
+                "SELECT facility_id, facility_name, sport, location, hourly_rate, is_available "
+                "FROM facilities ORDER BY facility_name"
+            )
+            return cursor.fetchall()
     finally:
         connection.close()
 
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def index():
-    connection = get_db()
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT facility_id, facility_name, sport, location, hourly_rate
-                FROM facilities
-                WHERE is_available = TRUE
-                ORDER BY sport, facility_name
-            """)
-            facilities = cursor.fetchall()
-
-            cursor.execute("""
-                SELECT b.booking_id, c.customer_name, f.facility_name,
-                       f.sport, b.booking_date, b.start_time, b.end_time,
-                       b.hours, b.total_cost, b.status
-                FROM bookings b
-                JOIN customers c ON b.customer_id = c.customer_id
-                JOIN facilities f ON b.facility_id = f.facility_id
-                ORDER BY b.booking_id DESC
-                LIMIT 30
-            """)
-            bookings = cursor.fetchall()
-
-            cursor.execute("""
-                SELECT COUNT(*) AS total_bookings,
-                       COALESCE(SUM(total_cost), 0) AS total_usage_value
-                FROM bookings
-                WHERE status = 'Booked'
-            """)
-            report = cursor.fetchone()
-
-        return render_template(
-            "index.html",
-            facilities=facilities,
-            bookings=bookings,
-            report=report,
-            today=date.today().isoformat()
-        )
-    finally:
-        connection.close()
+    # Public page deliberately queries facilities only. Never fetch bookings or customers here.
+    return render_template("index.html", facilities=get_facilities(), today=date.today().isoformat())
 
 
 @app.route("/book", methods=["POST"])
 def book():
+    verify_csrf()
     customer_name = request.form.get("customer_name", "").strip()
     email = request.form.get("email", "").strip()
-    facility_id = request.form.get("facility_id", type=int)
-    booking_date = request.form.get("booking_date", "")
-    start_time = request.form.get("start_time", "")
-    end_time = request.form.get("end_time", "")
+    facility_raw = request.form.get("facility_id", "").strip()
+    booking_date_raw = request.form.get("booking_date", "").strip()
+    start_raw = request.form.get("start_time", "").strip()
+    end_raw = request.form.get("end_time", "").strip()
 
-    if not all([customer_name, email, facility_id, booking_date,
-                start_time, end_time]):
-        flash("Please complete every booking field.", "error")
+    if not customer_name or len(customer_name) > 100:
+        flash("Enter a name (up to 100 characters).", "error")
         return redirect(url_for("index"))
-
-    if len(customer_name) > 100 or len(email) > 150 or "@" not in email:
-        flash("Enter a valid demo name and email address.", "error")
+    if not email or len(email) > 150 or "@" not in email or email.startswith("@") or email.endswith("@"):
+        flash("Enter a valid email address.", "error")
         return redirect(url_for("index"))
 
     try:
-        chosen_date = date.fromisoformat(booking_date)
-        if chosen_date < date.today():
-            raise ValueError
-        start_minutes = int(start_time[:2]) * 60 + int(start_time[3:5])
-        end_minutes = int(end_time[:2]) * 60 + int(end_time[3:5])
-        if start_minutes < 0 or end_minutes > 1440 or end_minutes <= start_minutes:
-            raise ValueError
+        facility_id = int(facility_raw)
+        booking_day = date.fromisoformat(booking_date_raw)
+        start_time = datetime.strptime(start_raw, "%H:%M").time()
+        end_time = datetime.strptime(end_raw, "%H:%M").time()
     except (ValueError, TypeError):
-        flash("Choose a valid date and an end time after the start time.", "error")
+        flash("Enter a valid facility, date, and time.", "error")
         return redirect(url_for("index"))
 
-    hours = Decimal(end_minutes - start_minutes) / Decimal(60)
-    connection = get_db()
+    if booking_day < date.today():
+        flash("Bookings cannot be made for a past date.", "error")
+        return redirect(url_for("index"))
+    if end_time <= start_time:
+        flash("End time must be later than start time on the same day.", "error")
+        return redirect(url_for("index"))
 
+    start_dt = datetime.combine(booking_day, start_time)
+    end_dt = datetime.combine(booking_day, end_time)
+    hours = Decimal(str((end_dt - start_dt).total_seconds() / 3600)).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+
+    connection = db_connect()
     try:
         with connection.cursor() as cursor:
-            # Lock the facility row so concurrent bookings are checked safely.
-            cursor.execute("""
-                SELECT hourly_rate, is_available
-                FROM facilities
-                WHERE facility_id = %s
-                FOR UPDATE
-            """, (facility_id,))
+            # Lock the facility row to reduce the chance of simultaneous overlapping bookings.
+            cursor.execute(
+                "SELECT facility_id, hourly_rate, is_available FROM facilities "
+                "WHERE facility_id=%s FOR UPDATE",
+                (facility_id,),
+            )
             facility = cursor.fetchone()
-
             if not facility or not facility["is_available"]:
                 connection.rollback()
-                flash("That facility is not available.", "error")
+                flash("That facility is unavailable. Please choose another.", "error")
                 return redirect(url_for("index"))
 
-            cursor.execute("""
-                SELECT booking_id FROM bookings
-                WHERE facility_id = %s
-                  AND booking_date = %s
-                  AND status = 'Booked'
-                  AND start_time < %s
-                  AND end_time > %s
-                FOR UPDATE
-            """, (facility_id, booking_date, end_time, start_time))
-
+            cursor.execute(
+                "SELECT booking_id FROM bookings "
+                "WHERE facility_id=%s AND booking_date=%s AND status='Booked' "
+                "AND start_time < %s AND end_time > %s LIMIT 1",
+                (facility_id, booking_day, end_time, start_time),
+            )
             if cursor.fetchone():
                 connection.rollback()
-                flash("That time slot is already booked. Choose another time.", "error")
+                flash("That time slot is already booked. Please choose another time.", "error")
                 return redirect(url_for("index"))
 
-            cursor.execute("""
-                INSERT INTO customers (customer_name, email)
-                VALUES (%s, %s)
-            """, (customer_name, email))
+            cursor.execute(
+                "INSERT INTO customers (customer_name, email) VALUES (%s, %s)",
+                (customer_name, email),
+            )
             customer_id = cursor.lastrowid
-
-            total_cost = hours * Decimal(str(facility["hourly_rate"]))
-
-            cursor.execute("""
-                INSERT INTO bookings
-                    (customer_id, facility_id, booking_date,
-                     start_time, end_time, hours, total_cost)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (
-                customer_id, facility_id, booking_date,
-                start_time, end_time, hours, total_cost
-            ))
-
-        # Customer and booking are saved together in one transaction.
+            total_cost = (Decimal(str(facility["hourly_rate"])) * hours).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+            cursor.execute(
+                "INSERT INTO bookings "
+                "(customer_id, facility_id, booking_date, start_time, end_time, hours, total_cost, status) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, 'Booked')",
+                (customer_id, facility_id, booking_day, start_time, end_time, hours, total_cost),
+            )
         connection.commit()
-        flash("Booking successful! Your booking is saved .", "success")
-
-    except Exception:
+        # Do not reveal booking IDs, customer records, or the public booking list.
+        flash("Booking request submitted successfully.", "success")
+    except pymysql.MySQLError:
         connection.rollback()
-        app.logger.exception("Booking failed")
-        flash("Booking could not be completed. Check the database connection.", "error")
+        app.logger.exception("Database error while creating a booking")
+        flash("We could not save the booking. Please try again later.", "error")
     finally:
         connection.close()
-
     return redirect(url_for("index"))
 
 
-@app.route("/cancel/<int:booking_id>", methods=["POST"])
-def cancel_booking(booking_id):
-    connection = get_db()
+@app.route("/provider/login", methods=["GET", "POST"])
+def provider_login():
+    if session.get("provider_authenticated") is True:
+        return redirect(url_for("provider_dashboard"))
+
+    if request.method == "POST":
+        verify_csrf()
+        configured_password = os.environ.get("PROVIDER_PASSWORD", "")
+        supplied_password = request.form.get("password", "")
+        if configured_password and hmac.compare_digest(supplied_password, configured_password):
+            session.clear()
+            session["provider_authenticated"] = True
+            session["csrf_token"] = secrets.token_urlsafe(32)
+            return redirect(url_for("provider_dashboard"))
+        flash("Invalid provider password.", "error")
+
+    return render_template("provider_login.html")
+
+
+@app.route("/provider/logout", methods=["POST"])
+@provider_required
+def provider_logout():
+    verify_csrf()
+    session.clear()
+    flash("You have been logged out.", "success")
+    return redirect(url_for("provider_login"))
+
+
+@app.route("/provider", methods=["GET"])
+@app.route("/provider/dashboard", methods=["GET"])
+@provider_required
+def provider_dashboard():
+    connection = db_connect()
     try:
         with connection.cursor() as cursor:
-            cursor.execute("""
-                UPDATE bookings SET status = 'Cancelled'
-                WHERE booking_id = %s AND status = 'Booked'
-            """, (booking_id,))
+            cursor.execute(
+                "SELECT b.booking_id, c.customer_name, c.email, f.facility_name, f.sport, "
+                "f.location, b.booking_date, b.start_time, b.end_time, b.hours, b.total_cost, "
+                "b.status, b.created_at "
+                "FROM bookings b "
+                "JOIN customers c ON c.customer_id=b.customer_id "
+                "JOIN facilities f ON f.facility_id=b.facility_id "
+                "ORDER BY b.booking_date DESC, b.start_time DESC, b.booking_id DESC"
+            )
+            bookings = cursor.fetchall()
+            cursor.execute(
+                "SELECT COUNT(*) AS total_bookings, "
+                "COALESCE(SUM(CASE WHEN status='Booked' THEN 1 ELSE 0 END), 0) AS active_bookings, "
+                "COALESCE(SUM(CASE WHEN status='Cancelled' THEN 1 ELSE 0 END), 0) AS cancelled_bookings, "
+                "COALESCE(SUM(CASE WHEN status='Booked' THEN total_cost ELSE 0 END), 0) AS active_revenue "
+                "FROM bookings"
+            )
+            report = cursor.fetchone()
+            cursor.execute(
+                "SELECT f.facility_name, f.sport, "
+                "COUNT(CASE WHEN b.status='Booked' THEN 1 END) AS active_bookings, "
+                "COALESCE(SUM(CASE WHEN b.status='Booked' THEN b.hours ELSE 0 END), 0) AS booked_hours "
+                "FROM facilities f LEFT JOIN bookings b ON b.facility_id=f.facility_id "
+                "GROUP BY f.facility_id, f.facility_name, f.sport ORDER BY f.facility_name"
+            )
+            usage_report = cursor.fetchall()
+    finally:
+        connection.close()
+
+    return render_template(
+        "provider_dashboard.html", bookings=bookings, report=report, usage_report=usage_report
+    )
+
+
+@app.route("/provider/cancel/<int:booking_id>", methods=["POST"])
+@provider_required
+def cancel_booking(booking_id):
+    verify_csrf()
+    connection = db_connect()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE bookings SET status='Cancelled' "
+                "WHERE booking_id=%s AND status='Booked'",
+                (booking_id,),
+            )
             changed = cursor.rowcount
         connection.commit()
-
         if changed:
             flash("Booking cancelled.", "success")
         else:
-            flash("Active booking not found.", "error")
-    except Exception:
+            flash("Booking was not found or is already cancelled.", "error")
+    except pymysql.MySQLError:
         connection.rollback()
-        app.logger.exception("Cancellation failed")
-        flash("Could not cancel the booking.", "error")
+        app.logger.exception("Database error while cancelling a booking")
+        flash("Could not cancel the booking. Please try again.", "error")
     finally:
         connection.close()
-
-    return redirect(url_for("index"))
-
-
-@app.route("/health")
-def health():
-    """Simple endpoint to check whether the app and database are connected."""
-    connection = get_db()
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT 1 AS database_connected")
-            cursor.fetchone()
-        return {"app": "running", "database": "connected"}
-    finally:
-        connection.close()
+    return redirect(url_for("provider_dashboard"))
 
 
-# Create the tables when the app starts.
-# If credentials are missing or the database is unavailable, log the error;
-# the /health endpoint and normal pages will show the connection failure.
-try:
-    setup_db()
-except Exception:
-    app.logger.exception("Database initialization failed")
+@app.errorhandler(400)
+def bad_request(error):
+    return render_template("error.html", message=getattr(error, "description", "Invalid request.")), 400
+
+
+@app.errorhandler(404)
+def not_found(error):
+    return render_template("error.html", message="Page not found."), 404
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5000")))
+
