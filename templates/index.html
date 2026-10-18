@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sports Facility Booking</title>
+  <style>
+    *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#f4f7fb;color:#172033}header{background:#142b4a;color:white;padding:24px}main{max-width:1000px;margin:24px auto;padding:0 16px}.panel,.facility{background:white;border-radius:12px;padding:20px;margin-bottom:18px;box-shadow:0 3px 14px #17203312}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}label{display:block;font-weight:bold;margin:12px 0 6px}input,select{width:100%;padding:11px;border:1px solid #ccd4df;border-radius:7px;font:inherit}button,.linkbtn{display:inline-block;background:#1769aa;color:white;padding:11px 16px;border:0;border-radius:7px;text-decoration:none;font-weight:bold;cursor:pointer;margin-top:16px}.muted{color:#5d6878}.message{padding:12px;border-radius:8px;margin:12px 0}.success{background:#e4f7e9;color:#14552b}.error{background:#ffeded;color:#8b1e1e}
+  </style>
+</head>
+<body>
+<header><h1>Sports Facility Booking</h1><p>Explore facilities and request a time slot.</p></header>
+<main>
+  {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="message {{ category }}">{{ message }}</div>{% endfor %}{% endwith %}
+  <section class="panel"><h2>Available facilities</h2>
+    {% if facilities %}<div class="grid">{% for facility in facilities %}<article class="facility"><h3>{{ facility.facility_name }}</h3><p>{{ facility.sport }} · {{ facility.location }}</p><p><strong>₹{{ '%.2f'|format(facility.hourly_rate) }}/hour</strong></p><p class="muted">{{ 'Available for booking' if facility.is_available else 'Currently unavailable' }}</p></article>{% endfor %}</div>{% else %}<p>No facilities have been added yet. Please contact the provider.</p>{% endif %}
+  </section>
+  <section class="panel"><h2>Request a booking</h2><p class="muted">Your booking details are private and are not displayed on this public page.</p>
+    <form method="post" action="{{ url_for('book') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="customer_name">Your name</label><input id="customer_name" name="customer_name" maxlength="100" required>
+      <label for="email">Email address</label><input id="email" name="email" type="email" maxlength="150" required>
+      <label for="facility_id">Facility</label><select id="facility_id" name="facility_id" required><option value="">Choose a facility</option>{% for facility in facilities if facility.is_available %}<option value="{{ facility.facility_id }}">{{ facility.facility_name }} — {{ facility.sport }} (₹{{ '%.2f'|format(facility.hourly_rate) }}/hour)</option>{% endfor %}</select>
+      <div class="grid"><div><label for="booking_date">Date</label><input id="booking_date" name="booking_date" type="date" min="{{ today }}" required></div><div><label for="start_time">Start time</label><input id="start_time" name="start_time" type="time" required></div><div><label for="end_time">End time</label><input id="end_time" name="end_time" type="time" required></div></div>
+      <button type="submit">Submit booking</button>
+    </form>
+  </section>
+  <p><a href="{{ url_for('provider_login') }}">Provider login</a></p>
+</main>
+</body></html>
