@@ -1,0 +1,26 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Booking Confirmation</title>
+<style>
+body{font-family:Arial;background:#f4f7fb;padding:24px;color:#172033}
+main{max-width:600px;margin:40px auto;background:white;padding:24px;border-radius:12px}
+code{overflow-wrap:anywhere;background:#eee;padding:12px;display:block}
+</style>
+</head>
+<body>
+<main>
+<h1>Booking Submitted Successfully!</h1>
+<p>Your booking ID is:</p>
+<h2>{{ booking_id }}</h2>
+<p><strong>Save this private cancellation code now.</strong></p>
+<p>You need both the booking ID and this code to cancel the booking.</p>
+<code>{{ cancellation_code }}</code>
+<p>Keep this code private. It will not be shown again.</p>
+<p><a href="{{ url_for('index') }}">Return to booking page</a></p>
+</main>
+</body>
+</html>
