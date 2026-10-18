@@ -1,6 +1,7 @@
-import hashlib
+
 import os
 import hmac
+import hashlib
 import secrets
 from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
@@ -8,8 +9,8 @@ from functools import wraps
 
 import pymysql
 from flask import (
-    Flask, render_template, request, redirect, url_for,
-    session, flash, abort
+    Flask, render_template, request, redirect,
+    url_for, session, flash, abort
 )
 
 app = Flask(__name__)
@@ -81,8 +82,7 @@ def get_facilities():
 
 @app.route("/")
 def index():
-    # Public page reads facilities only.
-    # It never reads bookings or customer records.
+    # Public users can see facilities, not booking history.
     return render_template(
         "index.html",
         facilities=get_facilities(),
@@ -129,18 +129,25 @@ def book():
         flash("End time must be later than start time.", "error")
         return redirect(url_for("index"))
 
-    start_dt = datetime.combine(booking_day, start_time)
-    end_dt = datetime.combine(booking_day, end_time)
-
     hours = Decimal(
-        str((end_dt - start_dt).total_seconds() / 3600)
+        str((
+            datetime.combine(booking_day, end_time) -
+            datetime.combine(booking_day, start_time)
+        ).total_seconds() / 3600)
     ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
+    # Generate a one-time private code. Only its hash is stored in MySQL.
+    cancellation_code = secrets.token_urlsafe(32)
+    cancellation_hash = hashlib.sha256(
+        cancellation_code.encode("utf-8")
+    ).hexdigest()
+
     connection = db_connect()
+    new_booking_id = None
 
     try:
         with connection.cursor() as cursor:
-            # Lock the selected facility while checking availability.
+            # Lock the facility row while checking for overlapping bookings.
             cursor.execute("""
                 SELECT facility_id, hourly_rate, is_available
                 FROM facilities
@@ -154,7 +161,6 @@ def book():
                 flash("This facility is unavailable.", "error")
                 return redirect(url_for("index"))
 
-            # Reject overlapping active bookings.
             cursor.execute("""
                 SELECT booking_id
                 FROM bookings
@@ -184,22 +190,84 @@ def book():
             cursor.execute("""
                 INSERT INTO bookings
                 (customer_id, facility_id, booking_date, start_time,
-                 end_time, hours, total_cost, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, 'Booked')
+                 end_time, hours, total_cost, status,
+                 cancellation_token_hash)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 'Booked', %s)
             """, (
                 customer_id, facility_id, booking_day,
-                start_time, end_time, hours, total_cost
+                start_time, end_time, hours, total_cost,
+                cancellation_hash
             ))
 
-        connection.commit()
+            new_booking_id = cursor.lastrowid
 
-        # Do not reveal booking IDs, email addresses, or booking history.
-        flash("Booking submitted successfully.", "success")
+        connection.commit()
 
     except pymysql.MySQLError:
         connection.rollback()
         app.logger.exception("Database error during booking")
         flash("Could not save the booking. Please try again later.", "error")
+        return redirect(url_for("index"))
+
+    finally:
+        connection.close()
+
+    # Display the private code only after the booking is committed.
+    return render_template(
+        "booking_confirmation.html",
+        booking_id=new_booking_id,
+        cancellation_code=cancellation_code
+    )
+
+
+@app.route("/cancel-my-booking", methods=["POST"])
+def cancel_my_booking():
+    verify_csrf()
+
+    try:
+        booking_id = int(request.form.get("booking_id", ""))
+        cancellation_code = request.form.get("cancellation_code", "").strip()
+    except (ValueError, TypeError):
+        flash("Enter a valid booking ID and cancellation code.", "error")
+        return redirect(url_for("index"))
+
+    if not cancellation_code or len(cancellation_code) > 200:
+        flash("Enter your private cancellation code.", "error")
+        return redirect(url_for("index"))
+
+    token_hash = hashlib.sha256(
+        cancellation_code.encode("utf-8")
+    ).hexdigest()
+
+    connection = db_connect()
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                UPDATE bookings
+                SET status = 'Cancelled',
+                    cancellation_token_hash = NULL
+                WHERE booking_id = %s
+                  AND cancellation_token_hash = %s
+                  AND status = 'Booked'
+            """, (booking_id, token_hash))
+            changed = cursor.rowcount
+
+        connection.commit()
+
+        if changed:
+            flash("Your booking has been cancelled.", "success")
+        else:
+            flash(
+                "Booking could not be cancelled. Check the ID and code, "
+                "or the booking may already be cancelled.",
+                "error"
+            )
+
+    except pymysql.MySQLError:
+        connection.rollback()
+        app.logger.exception("Customer cancellation failed")
+        flash("Cancellation failed. Please try again later.", "error")
 
     finally:
         connection.close()
@@ -309,7 +377,8 @@ def cancel_booking(booking_id):
         with connection.cursor() as cursor:
             cursor.execute("""
                 UPDATE bookings
-                SET status = 'Cancelled'
+                SET status = 'Cancelled',
+                    cancellation_token_hash = NULL
                 WHERE booking_id = %s AND status = 'Booked'
             """, (booking_id,))
             changed = cursor.rowcount
@@ -323,7 +392,7 @@ def cancel_booking(booking_id):
 
     except pymysql.MySQLError:
         connection.rollback()
-        app.logger.exception("Database error while cancelling booking")
+        app.logger.exception("Provider cancellation failed")
         flash("Could not cancel the booking.", "error")
 
     finally:
