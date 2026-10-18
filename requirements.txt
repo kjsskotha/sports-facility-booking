@@ -1,5 +1,3 @@
-
-Flask
-gunicorn
-PyMySQL
-cryptography
+Flask>=3.0,<4.0
+PyMySQL>=1.1,<2.0
+gunicorn>=22.0,<24.0
