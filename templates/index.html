@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -12,7 +13,7 @@ main{max-width:1000px;margin:24px auto;padding:0 16px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
 label{display:block;font-weight:bold;margin:12px 0 6px}
 input,select{width:100%;padding:11px;box-sizing:border-box}
-button{background:#1769aa;color:white;padding:11px 16px;border:0;border-radius:7px;margin-top:16px}
+button{background:#1769aa;color:white;padding:11px 16px;border:0;border-radius:7px;margin-top:16px;cursor:pointer}
 .message{padding:12px;margin:12px 0;border-radius:8px}
 .success{background:#e4f7e9}.error{background:#ffeded}
 .muted{color:#5d6878}
@@ -85,6 +86,22 @@ button{background:#1769aa;color:white;padding:11px 16px;border:0;border-radius:7
 </div>
 
 <button type="submit">Submit Booking</button>
+</form>
+</section>
+
+<section class="panel">
+<h2>Cancel Your Booking</h2>
+<p>Enter the booking ID and private cancellation code shown after your booking was submitted.</p>
+<form method="post" action="{{ url_for('cancel_my_booking') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+<label for="cancel_booking_id">Booking ID</label>
+<input id="cancel_booking_id" name="booking_id" type="number" min="1" required>
+
+<label for="cancellation_code">Private Cancellation Code</label>
+<input id="cancellation_code" name="cancellation_code" type="password" required>
+
+<button type="submit">Cancel My Booking</button>
 </form>
 </section>
 
